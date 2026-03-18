@@ -11,7 +11,7 @@ import axios from 'axios'
 // ── Instancia base de axios ───────────────────────────────
 // Todas las peticiones usarán esta URL como base
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: 'https://medistock-backend-dgyt.onrender.com/api',
   timeout: 10000, // si el servidor no responde en 10s, cancela
 })
 

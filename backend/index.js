@@ -58,9 +58,9 @@ app.use(helmet({
   }
 }))
 
-// CORS — solo permite peticiones del frontend
+// CORS — temporalmente acepta cualquier origen para configurar Vercel
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: true, // temporal, lo restringimos después
   credentials: true
 }))
 
