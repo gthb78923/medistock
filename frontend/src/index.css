@@ -1,0 +1,6 @@
+/* index.css */
+/* Estas tres líneas activan Tailwind completo en tu proyecto */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
