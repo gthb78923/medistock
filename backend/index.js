@@ -58,9 +58,9 @@ app.use(helmet({
   }
 }))
 
-// CORS — temporalmente acepta cualquier origen para configurar Vercel
+// CORS — restringido a la URL real de Vercel
 app.use(cors({
-  origin: true, // temporal, lo restringimos después
+  origin: 'https://medistock-iota.vercel.app',
   credentials: true
 }))
 
