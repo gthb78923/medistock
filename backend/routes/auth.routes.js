@@ -12,7 +12,7 @@ import {
 } from '../middlewares/validacion.js'
 import { invalidarToken } from '../middlewares/tokenBlacklist.js'
 import { verificarToken } from '../middlewares/auth.js'
-import { AppError } from '../utils/AppError.js'  // ← NUEVO IMPORT AGREGADO
+import { AppError } from '../utils/AppError.js'
 
 const router = Router()
 
@@ -58,7 +58,7 @@ router.post('/registro', reglasRegistro, validar, async (req, res) => {
       [email]
     )
     if (existente.rows.length > 0) {
-      throw new AppError('El email ya está registrado.', 409)  // ← REEMPLAZADO
+      throw new AppError('El email ya está registrado.', 409)
     }
 
     // Hash seguro con bcrypt costo 12
@@ -122,7 +122,7 @@ router.post('/login', reglasLogin, validar, async (req, res) => {
          VALUES ($1, $2, $3, $4)`,
         [null, 'login_fallido', `Email no encontrado: ${email}`, ip]
       )
-      throw new AppError('Credenciales incorrectas.', 401)  // ← REEMPLAZADO
+      throw new AppError('Credenciales incorrectas.', 401)
     }
 
     const passwordValida = await bcrypt.compare(password, usuario.password_hash)
@@ -138,7 +138,7 @@ router.post('/login', reglasLogin, validar, async (req, res) => {
         [usuario.id, 'login_fallido', 'Contraseña incorrecta', ip]
       )
 
-      throw new AppError(  // ← REEMPLAZADO
+      throw new AppError(
         `Credenciales incorrectas. ${intentosRestantes > 0
           ? `${intentosRestantes} intentos restantes.`
           : 'Cuenta bloqueada temporalmente.'}`,
@@ -149,15 +149,35 @@ router.post('/login', reglasLogin, validar, async (req, res) => {
     // Login exitoso — limpiar intentos fallidos
     registrarIntento(ip, true)
 
-    // ── Verificar si el usuario tiene MFA activo ──────────
+    // ── Si tiene MFA activo, enviar código al correo ──────────
     if (usuario.mfa_activo) {
-      // No emitimos el token aún.
-      // Devolvemos solo el userId para el segundo paso.
-      // El token real se emite en /api/mfa/validar-login
+      // Invalidar códigos anteriores
+      await pool.query(
+        'UPDATE mfa_codigos SET usado = true WHERE usuario_id = $1 AND usado = false',
+        [usuario.id]
+      )
+
+      // Generar y guardar código
+      const codigo = Math.floor(100000 + Math.random() * 900000).toString()
+      const expiraEn = new Date(Date.now() + 5 * 60 * 1000)
+
+      await pool.query(
+        `INSERT INTO mfa_codigos (usuario_id, codigo, expira_en)
+         VALUES ($1, $2, $3)`,
+        [usuario.id, codigo, expiraEn]
+      )
+
+      // Enviar por correo
+      const { enviarCodigoMFA } = await import('../utils/email.js')
+      await enviarCodigoMFA(usuario.email, usuario.nombre, codigo)
+
+      const emailOculto = usuario.email.replace(/(.{2})(.*)(@.*)/, '$1***$3')
+
       return res.json({
         mfa_requerido: true,
         userId: usuario.id,
-        mensaje: 'Ingresa el código de tu app de autenticación.'
+        emailOculto,
+        mensaje: `Código enviado a ${emailOculto}`
       })
     }
 

@@ -1,5 +1,5 @@
 // ============================================
-// pages/MFA.jsx — Configurar autenticación de dos factores
+// pages/MFA.jsx — Configurar MFA por correo
 // ============================================
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -11,41 +11,32 @@ import Logo from '../components/Logo'
 function MFA() {
   const { usuario } = useAuth()
   const navigate = useNavigate()
-  const [paso, setPaso] = useState(1)
-  const [qr, setQr] = useState('')
-  const [secreto, setSecreto] = useState('')
-  const [codigo, setCodigo] = useState('')
-  const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
-  const [exitoso, setExitoso] = useState(false)
+  const [activado, setActivado] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleConfigurar = async () => {
+  const handleActivar = async () => {
     setCargando(true)
     try {
-      const res = await api.post('/mfa/configurar')
-      setQr(res.data.qr)
-      setSecreto(res.data.secreto)
-      setPaso(2)
+      await api.post('/mfa/activar')
+      setActivado(true)
+      setTimeout(() => navigate('/'), 3000)
     } catch (err) {
-      setError('Error al generar el QR.')
+      setError(err.response?.data?.error || 'Error al activar MFA.')
     } finally {
       setCargando(false)
     }
   }
 
-  const handleVerificar = async () => {
-    if (!/^\d{6}$/.test(codigo)) {
-      setError('El código debe ser de 6 dígitos.')
-      return
-    }
+  const handleDesactivar = async () => {
     setCargando(true)
-    setError('')
     try {
-      await api.post('/mfa/verificar', { codigo })
-      setExitoso(true)
-      setTimeout(() => navigate('/'), 3000)
+      await api.post('/mfa/desactivar')
+      setActivado(false)
+      setError('')
+      alert('MFA desactivado correctamente.')
     } catch (err) {
-      setError(err.response?.data?.error || 'Código incorrecto.')
+      setError(err.response?.data?.error || 'Error al desactivar.')
     } finally {
       setCargando(false)
     }
@@ -64,63 +55,45 @@ function MFA() {
 
         <div className="bg-gray-900 rounded-2xl p-8 border border-gray-800 shadow-2xl">
 
-          {exitoso ? (
+          {activado ? (
             <div className="text-center">
               <div className="text-5xl mb-4">✅</div>
               <h2 className="text-white text-xl font-bold mb-2">MFA activado</h2>
-              <p className="text-gray-400 text-sm">Tu cuenta ahora tiene doble factor de autenticación. Redirigiendo...</p>
-            </div>
-          ) : paso === 1 ? (
-            <div>
-              <h2 className="text-white text-xl font-bold mb-2">Configurar MFA</h2>
-              <p className="text-gray-400 text-sm mb-6">
-                El MFA agrega una capa extra de seguridad. Además de tu contraseña, necesitarás un código de 6 dígitos de tu app de autenticación cada vez que inicies sesión.
+              <p className="text-gray-400 text-sm">
+                Desde ahora cada vez que inicies sesión recibirás un código de verificación en tu correo <strong className="text-white">{usuario?.email}</strong>.
               </p>
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-6">
-                <p className="text-blue-400 text-sm font-medium mb-2">¿Qué app necesitas?</p>
-                <p className="text-gray-400 text-sm">Descarga <strong className="text-white">Google Authenticator</strong> o <strong className="text-white">Authy</strong> en tu celular antes de continuar.</p>
-              </div>
-              {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-              <Boton onClick={handleConfigurar} cargando={cargando}>
-                Generar código QR
-              </Boton>
             </div>
           ) : (
             <div>
-              <h2 className="text-white text-xl font-bold mb-2">Escanea el código QR</h2>
+              <h2 className="text-white text-xl font-bold mb-2">Autenticación de dos factores</h2>
               <p className="text-gray-400 text-sm mb-6">
-                Abre Google Authenticator o Authy y escanea este código. Luego ingresa el código de 6 dígitos que aparece.
+                Activa el MFA para proteger tu cuenta. Cada vez que inicies sesión recibirás un código de 6 dígitos en tu correo que deberás ingresar para completar el acceso.
               </p>
 
-              {/* QR Code */}
-              <div className="flex justify-center mb-4">
-                <div className="bg-white p-3 rounded-xl">
-                  <img src={qr} alt="QR MFA" className="w-48 h-48" />
-                </div>
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-6">
+                <p className="text-blue-400 text-sm font-medium mb-1">¿Cómo funciona?</p>
+                <ol className="text-gray-400 text-sm space-y-1 list-decimal list-inside">
+                  <li>Ingresas tu email y contraseña normalmente</li>
+                  <li>El sistema envía un código de 6 dígitos a tu correo</li>
+                  <li>Ingresas el código para completar el login</li>
+                  <li>El código expira en 5 minutos y es de un solo uso</li>
+                </ol>
               </div>
 
-              {/* Clave manual por si no pueden escanear */}
-              <div className="bg-gray-800 rounded-lg p-3 mb-6 text-center">
-                <p className="text-gray-500 text-xs mb-1">¿No puedes escanear? Ingresa esta clave manualmente:</p>
-                <p className="text-white text-sm font-mono tracking-widest">{secreto}</p>
+              <div className="bg-gray-800 rounded-lg p-3 mb-6">
+                <p className="text-gray-400 text-sm">
+                  Tu correo: <strong className="text-white">{usuario?.email}</strong>
+                </p>
               </div>
 
-              {/* Input del código */}
+              {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+
               <div className="flex flex-col gap-3">
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={codigo}
-                  onChange={(e) => {
-                    setCodigo(e.target.value.replace(/\D/g, ''))
-                    setError('')
-                  }}
-                  placeholder="000000"
-                  className="text-center text-2xl tracking-widest px-4 py-3 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-600 outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-                <Boton onClick={handleVerificar} cargando={cargando}>
-                  Verificar y activar MFA
+                <Boton onClick={handleActivar} cargando={cargando}>
+                  Activar MFA en mi cuenta
+                </Boton>
+                <Boton variante="peligro" onClick={handleDesactivar} cargando={cargando}>
+                  Desactivar MFA
                 </Boton>
               </div>
             </div>

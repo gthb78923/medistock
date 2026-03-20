@@ -1,9 +1,6 @@
 // ============================================
 // pages/auth/ValidarMFA.jsx
 // ============================================
-// Segunda pantalla del login cuando el usuario tiene MFA activo.
-// El usuario ingresa el código de su app para completar el login.
-
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -16,14 +13,15 @@ function ValidarMFA() {
   const location = useLocation()
   const { login } = useAuth()
 
-  // El userId viene del primer paso del login
   const userId = location.state?.userId
+  const emailOculto = location.state?.emailOculto
 
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [reenviando, setReenviando] = useState(false)
+  const [reenviadoMsg, setReenviadoMsg] = useState('')
 
-  // Si no hay userId, redirigir al login
   if (!userId) {
     navigate('/login')
     return null
@@ -48,8 +46,23 @@ function ValidarMFA() {
 
     } catch (err) {
       setError(err.response?.data?.error || 'Código incorrecto.')
+      setCodigo('')
     } finally {
       setCargando(false)
+    }
+  }
+
+  const handleReenviar = async () => {
+    setReenviando(true)
+    setReenviadoMsg('')
+    setError('')
+    try {
+      await api.post('/mfa/enviar-codigo', { userId })
+      setReenviadoMsg('Código reenviado a tu correo.')
+    } catch (err) {
+      setError('Error al reenviar el código.')
+    } finally {
+      setReenviando(false)
     }
   }
 
@@ -66,26 +79,34 @@ function ValidarMFA() {
 
         <div className="bg-gray-900 rounded-2xl p-8 border border-gray-800 shadow-2xl">
           <div className="text-center mb-6">
-            <div className="text-4xl mb-3">🔐</div>
-            <h2 className="text-white text-xl font-bold mb-2">Código de verificación</h2>
+            <div className="text-4xl mb-3">📧</div>
+            <h2 className="text-white text-xl font-bold mb-2">Revisa tu correo</h2>
             <p className="text-gray-400 text-sm">
-              Abre tu app de autenticación e ingresa el código de 6 dígitos que aparece para MediStock.
+              Enviamos un código de verificación a
             </p>
+            <p className="text-white font-semibold mt-1">{emailOculto}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <input
-              type="text"
-              maxLength={6}
-              value={codigo}
-              onChange={(e) => {
-                setCodigo(e.target.value.replace(/\D/g, ''))
-                setError('')
-              }}
-              placeholder="000000"
-              className="text-center text-3xl tracking-widest px-4 py-4 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-600 outline-none focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-gray-400 text-center">
+                Ingresa el código de 6 dígitos
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={codigo}
+                onChange={(e) => {
+                  setCodigo(e.target.value.replace(/\D/g, ''))
+                  setError('')
+                }}
+                placeholder="000000"
+                className="text-center text-3xl tracking-widest px-4 py-4 rounded-lg bg-gray-800 border border-gray-600 text-white placeholder-gray-600 outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+              <p className="text-gray-600 text-xs text-center">El código expira en 5 minutos</p>
+            </div>
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
@@ -93,9 +114,24 @@ function ValidarMFA() {
               </div>
             )}
 
+            {reenviadoMsg && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3">
+                <p className="text-green-400 text-sm text-center">{reenviadoMsg}</p>
+              </div>
+            )}
+
             <Boton type="submit" cargando={cargando}>
               Verificar código
             </Boton>
+
+            <button
+              type="button"
+              onClick={handleReenviar}
+              disabled={reenviando}
+              className="text-blue-400 hover:text-blue-300 text-sm text-center transition-all disabled:opacity-50"
+            >
+              {reenviando ? 'Reenviando...' : '¿No recibiste el código? Reenviar'}
+            </button>
 
             <button
               type="button"
